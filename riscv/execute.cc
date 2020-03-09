@@ -147,6 +147,51 @@ bool processor_t::slow_path()
   return debug || state.single_step != state.STEP_NONE || state.debug_mode;
 }
 
+void processor_t::detect_macro_op(insn_t prev, insn_t insn, reg_t pc) {
+
+  insn_desc_t* p = &instructions[0];
+  while ((prev.bits() & p->mask) != p->match)
+    p++;
+  insn_desc_t first = *p;
+
+  p = &instructions[0];
+  while ((insn.bits() & p->mask) != p->match)
+    p++;
+  insn_desc_t second = *p;
+
+  if (first.mask == MASK_SLLIW && first.match == MATCH_SLLIW && second.mask == MASK_SRAIW && second.match == MATCH_SRAIW) {
+    if (prev.rd() == insn.rd()) {
+      mop_count++;
+      slliwsraiw_count++;
+    }
+  } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LW && second.match == MATCH_LW) {
+    if (prev.rd() == insn.rd()) {
+      mop_count++;
+      addlw_count++;
+    }
+  } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LBU && second.match == MATCH_LBU) {
+    if (prev.rd() == insn.rd()) {
+      mop_count++;
+      addlbu_count++;
+    }
+  } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LHU && second.match == MATCH_LHU) {
+    if (prev.rd() == insn.rd()) {
+      mop_count++;
+      addlhu_count++;
+    }
+  } else if (first.mask == MASK_SLLI && first.match == MATCH_SLLI && second.mask == MASK_SRLI && second.match == MATCH_SRLI) {
+    if (prev.rd() == insn.rd()) {
+      mop_count++;
+      sllisrli_count++;
+    }
+  } else if (first.mask == MASK_LUI && first.match == MATCH_LUI && second.mask == MASK_ADDI && second.match == MATCH_ADDI) {
+    if (prev.rd() == insn.rd()) {
+      mop_count++;
+      luiaddi_count++;
+    }
+  }
+}
+
 // fetch/decode/execute loop
 void processor_t::step(size_t n)
 {
@@ -201,6 +246,13 @@ void processor_t::step(size_t n)
           }
 
           insn_fetch_t fetch = mmu->load_insn(pc);
+          if (macro_op_fusion_enabled) {
+            if (macro_op_found) {
+              mop_count++;
+            } else {
+              fetch.insn = fetch.insn.mop_first_insn();
+            }
+          }
           if (debug && !state.serialized)
             disasm(fetch.insn);
           pc = execute_insn(this, pc, fetch);
@@ -236,10 +288,17 @@ void processor_t::step(size_t n)
         // This macro is included in "icache.h" included within the switch
         // statement below. The indirect jump corresponding to the instruction
         // is located within the execute_insn() function call.
+        // 
         #define ICACHE_ACCESS(i) { \
           insn_fetch_t fetch = ic_entry->data; \
+          if (!macro_op_fusion_enabled) detect_macro_op(prev_insn, fetch.insn, pc); \
+          if (macro_op_fusion_enabled && fetch.insn.mop_length() != 0) macro_op_found = true; \
+          if (macro_op_fusion_enabled && !macro_op_found) fetch.insn = fetch.insn.mop_first_insn(); \
           pc = execute_insn(this, pc, fetch); \
+          prev_insn = fetch.insn; \
           ic_entry = ic_entry->next; \
+          if (macro_op_fusion_enabled && macro_op_found) mop_count++; \
+          macro_op_found = false; \
           if (i == mmu_t::ICACHE_ENTRIES-1) break; \
           if (unlikely(ic_entry->tag != pc)) break; \
           if (unlikely(instret+1 == n)) break; \
@@ -276,6 +335,9 @@ void processor_t::step(size_t n)
         // instructions are idempotent so restarting is safe.)
 
         insn_fetch_t fetch = mmu->load_insn(pc);
+        if (macro_op_fusion_enabled) {
+          fetch.insn = fetch.insn.mop_first_insn();
+        }
         pc = execute_insn(this, pc, fetch);
         advance_pc();
 

@@ -243,11 +243,27 @@ public:
     auto tlb_entry = translate_insn_addr(addr);
     insn_bits_t insn = from_le(*(uint16_t*)(tlb_entry.host_offset + addr));
     int length = insn_length(insn);
-
+    uint64_t sign = 0;
+    uint64_t second_sign = 0;
     if (likely(length == 4)) {
       insn |= (insn_bits_t)from_le(*(const int16_t*)translate_insn_addr_to_host(addr + 2)) << 16;
+      sign = int64_t(insn) >> 63;
+        insn_bits_t next_insn = (insn_bits_t)from_le(*(const uint16_t*)translate_insn_addr_to_host(addr + 4));
+        if (proc->macro_op_fusion_enabled && insn_length(next_insn) == 4) {
+          insn &= 0xffffffff;
+          insn_bits_t tmp = next_insn | ((insn_bits_t)from_le(*(const int16_t*)translate_insn_addr_to_host(addr + 6)) << 48);
+          second_sign = int64_t(tmp) >> 63;
+          insn |= (insn_bits_t)from_le(*(const int16_t*)translate_insn_addr_to_host(addr + 6)) << 48;
+          insn |= next_insn << 32;
+        }
     } else if (length == 2) {
       insn = (int16_t)insn;
+      sign = int64_t(insn) >> 63;
+        insn_bits_t next_insn = (insn_bits_t)from_le(*(const int16_t*)translate_insn_addr_to_host(addr + 2));
+        if (proc->macro_op_fusion_enabled && insn_length(next_insn) == 2) {
+          insn &= 0xffff;
+          insn |= next_insn << 16;
+        }
     } else if (length == 6) {
       insn |= (insn_bits_t)from_le(*(const int16_t*)translate_insn_addr_to_host(addr + 4)) << 32;
       insn |= (insn_bits_t)from_le(*(const uint16_t*)translate_insn_addr_to_host(addr + 2)) << 16;
@@ -258,9 +274,20 @@ public:
       insn |= (insn_bits_t)from_le(*(const uint16_t*)translate_insn_addr_to_host(addr + 2)) << 16;
     }
 
-    insn_fetch_t fetch = {proc->decode_insn(insn), insn};
+    insn_t instruction;
+    instruction = (insn_t) insn;
+    instruction.set_sign(sign);
+    instruction.set_second_sign(second_sign);
+    if (instruction.bits() == 0x0) {
+      fprintf(stderr, "mmu.h: zero insn!!!\n");
+      fprintf(stderr, "insn: 0x%016" PRIx64 "\n", insn);
+    }
+    insn_fetch_t fetch = {proc->decode_insn(instruction), instruction};
+    if (proc->macro_op_fusion_enabled && !proc->macro_op_found) {
+      fetch.insn = fetch.insn.mop_first_insn();
+    }
     entry->tag = addr;
-    entry->next = &icache[icache_index(addr + length)];
+    entry->next = &icache[icache_index(addr + length + fetch.insn.mop_length())];
     entry->data = fetch;
 
     reg_t paddr = tlb_entry.target_offset + addr;;

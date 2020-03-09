@@ -79,6 +79,30 @@ public:
   insn_t(insn_bits_t bits) : b(bits) {}
   insn_bits_t bits() { return b; }
   int length() { return insn_length(b); }
+  int mop_length() {
+    int len = insn_length(b);
+    if (len == 2 && b >> 16 != 0) {
+      return insn_length(b >> 16) == 2 ? 2 : 0;
+    } else if (len == 4 && b >> 32 != 0) {
+      return insn_length(b >> 32) == 4 ? 4 : 0;
+    }
+    return 0;
+  }
+  insn_t mop_first_insn() { 
+    insn_t first_insn;
+    first_insn = mop_length() == 4 ? (x(0, 32) | (sign << 32)) : mop_length() == 2 ? (x(0, 16) | (sign << 16)) : b;
+    first_insn.set_sign(sign);
+    return first_insn; 
+  }
+  insn_t mop_second_insn() { 
+    insn_t second_insn;
+    second_insn = mop_length() == 4 ? (x(32, 32) | (second_sign << 32)) : mop_length() == 2 ? (x(16, 16) | (second_sign << 16)) : b;
+    second_insn.set_second_sign(second_sign);
+    return second_insn; 
+  }
+  void set_sign(uint64_t value) { sign = value; }
+  void set_second_sign(uint64_t value) { second_sign = value; }
+  uint64_t get_sign() { return sign; }
   int64_t i_imm() { return int64_t(b) >> 20; }
   int64_t shamt() { return x(20, 6); }
   int64_t s_imm() { return x(7, 5) + (xs(25, 7) << 5); }
@@ -121,9 +145,11 @@ public:
 
 private:
   insn_bits_t b;
+  uint64_t sign;
+  uint64_t second_sign;
   uint64_t x(int lo, int len) { return (b >> lo) & ((insn_bits_t(1) << len)-1); }
   uint64_t xs(int lo, int len) { return int64_t(b) << (64-lo-len) >> (64-len); }
-  uint64_t imm_sign() { return xs(63, 1); }
+  uint64_t imm_sign() { return sign; }
 };
 
 template <class T, size_t N, bool zero_reg>
@@ -162,7 +188,10 @@ private:
 #define RS1 READ_REG(insn.rs1())
 #define RS2 READ_REG(insn.rs2())
 #define RS3 READ_REG(insn.rs3())
+#define MOP_RS1 READ_REG(insn.mop_first_insn().rs1())
+#define MOP_RS2 READ_REG(insn.mop_first_insn().rs2())
 #define WRITE_RD(value) WRITE_REG(insn.rd(), value)
+#define MOP_WRITE_RD(value) WRITE_REG(insn.mop_first_insn().rd(), value)
 
 #ifndef RISCV_ENABLE_COMMITLOG
 # define WRITE_REG(reg, value) STATE.XPR.write(reg, value)
@@ -195,6 +224,8 @@ private:
 #define RVC_FRS2 READ_FREG(insn.rvc_rs2())
 #define RVC_FRS2S READ_FREG(insn.rvc_rs2s())
 #define RVC_SP READ_REG(X_SP)
+#define MOP_RVC_RS1 READ_REG(insn.mop_first_insn().rvc_rs1())
+#define MOP_RVC_RS2 READ_REG(insn.mop_first_insn().rvc_rs2())
 
 // FPU macros
 #define FRS1 READ_FREG(insn.rs1())

@@ -1,0 +1,1 @@
+MOP_WRITE_RD(MMU.load_int32(MOP_RS1 + MOP_RS2 + insn.mop_second_insn().i_imm()));
