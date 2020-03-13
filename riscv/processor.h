@@ -421,13 +421,8 @@ private:
   uint64_t last_pc, last_bits, executions;
   insn_t prev_insn = 0;
   bool macro_op_found;
+  std::map<std::string, uint64_t> mop_histogram;
   uint64_t mop_count;
-  uint64_t addlw_count;
-  uint64_t addlbu_count;
-  uint64_t addlhu_count;
-  uint64_t sllisrli_count;
-  uint64_t slliwsraiw_count;
-  uint64_t luiaddi_count;
 public:
   class vectorUnit_t {
     public:

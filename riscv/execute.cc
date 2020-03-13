@@ -161,33 +161,39 @@ void processor_t::detect_macro_op(insn_t prev, insn_t insn, reg_t pc) {
 
   if (first.mask == MASK_SLLIW && first.match == MATCH_SLLIW && second.mask == MASK_SRAIW && second.match == MATCH_SRAIW) {
     if (prev.rd() == insn.rd()) {
-      mop_count++;
-      slliwsraiw_count++;
+      mop_histogram["slliwsraiw"]++;
     }
   } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LW && second.match == MATCH_LW) {
     if (prev.rd() == insn.rd()) {
-      mop_count++;
-      addlw_count++;
+      mop_histogram["add lw"]++;
     }
   } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LBU && second.match == MATCH_LBU) {
     if (prev.rd() == insn.rd()) {
-      mop_count++;
-      addlbu_count++;
+      mop_histogram["add lbu"]++;
     }
   } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LHU && second.match == MATCH_LHU) {
     if (prev.rd() == insn.rd()) {
-      mop_count++;
-      addlhu_count++;
+      mop_histogram["add lhu"]++;
     }
   } else if (first.mask == MASK_SLLI && first.match == MATCH_SLLI && second.mask == MASK_SRLI && second.match == MATCH_SRLI) {
     if (prev.rd() == insn.rd()) {
-      mop_count++;
-      sllisrli_count++;
+      mop_histogram["slli srli"]++;
     }
   } else if (first.mask == MASK_LUI && first.match == MATCH_LUI && second.mask == MASK_ADDI && second.match == MATCH_ADDI) {
     if (prev.rd() == insn.rd()) {
-      mop_count++;
-      luiaddi_count++;
+      mop_histogram["lui addi"]++;
+    }
+  } else if (first.mask == MASK_C_SLLI && first.match == MATCH_C_SLLI && second.mask == MASK_C_SRLI && second.match == MATCH_C_SRLI) {
+    if (prev.rd() == insn.rvc_rs1s()) {
+      mop_histogram["cslli csrli"]++;
+    }
+  } else if (first.mask == MASK_SLLI && first.match == MATCH_SLLI && second.mask == MASK_C_SRLI && second.match == MATCH_C_SRLI) {
+    if (prev.rd() == insn.rvc_rs1s()) {
+      mop_histogram["slli csrli"]++;
+    }
+  } else if (first.mask == MASK_C_ADD && first.match == MATCH_C_ADD && second.mask == MASK_LHU && second.match == MATCH_LHU) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["cadd lhu"]++;
     }
   }
 }

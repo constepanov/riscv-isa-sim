@@ -149,7 +149,7 @@ private:
   uint64_t second_sign;
   uint64_t x(int lo, int len) { return (b >> lo) & ((insn_bits_t(1) << len)-1); }
   uint64_t xs(int lo, int len) { return int64_t(b) << (64-lo-len) >> (64-len); }
-  uint64_t imm_sign() { return sign; }
+  uint64_t imm_sign() { return xs(63, 1); }
 };
 
 template <class T, size_t N, bool zero_reg>

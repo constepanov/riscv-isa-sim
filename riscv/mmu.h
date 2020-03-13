@@ -278,10 +278,6 @@ public:
     instruction = (insn_t) insn;
     instruction.set_sign(sign);
     instruction.set_second_sign(second_sign);
-    if (instruction.bits() == 0x0) {
-      fprintf(stderr, "mmu.h: zero insn!!!\n");
-      fprintf(stderr, "insn: 0x%016" PRIx64 "\n", insn);
-    }
     insn_fetch_t fetch = {proc->decode_insn(instruction), instruction};
     if (proc->macro_op_fusion_enabled && !proc->macro_op_found) {
       fetch.insn = fetch.insn.mop_first_insn();

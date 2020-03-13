@@ -53,14 +53,11 @@ processor_t::~processor_t()
 #endif
   
   fprintf(stderr, "insn count: %ld\n", state.minstret);
-  fprintf(stderr, "macro-op count: %ld, percent: %f\n", mop_count, (double) mop_count / state.minstret);
-  
-  fprintf(stderr, "addlw count: %ld, percent: %f\n", addlw_count, (double) addlw_count / state.minstret);
-  fprintf(stderr, "addlbu count: %ld, percent: %f\n", addlbu_count, (double) addlbu_count / state.minstret);
-  fprintf(stderr, "addlhu count: %ld, percent: %f\n", addlhu_count, (double) addlhu_count / state.minstret);
-  fprintf(stderr, "sllisrli count: %ld, percent: %f\n", sllisrli_count, (double) sllisrli_count / state.minstret);
-  fprintf(stderr, "slliwsraiw count: %ld, percent: %f\n", slliwsraiw_count, (double) slliwsraiw_count / state.minstret);
-  fprintf(stderr, "luiaddi count: %ld, percent: %f\n", luiaddi_count, (double) luiaddi_count / state.minstret);
+  for (auto it : mop_histogram) {
+    mop_count += it.second;
+    fprintf(stderr, "%s count: %ld, percent: %f\n", it.first.c_str(), it.second, (double) it.second / state.minstret);
+  }
+  fprintf(stderr, "total macro-op count: %ld, percent: %f\n", mop_count, (double) mop_count / state.minstret);
   
   delete mmu;
   delete disassembler;
@@ -1047,47 +1044,30 @@ insn_func_t processor_t::decode_insn(insn_t insn)
   if (unlikely(insn.bits() != desc.match)) {
     insn_desc_t* p = &instructions[0];
     if (macro_op_fusion_enabled && insn.mop_length() != 0 && insn.mop_first_insn().rd() == insn.mop_second_insn().rd()) {
-      //fprintf(stderr, "decoding macro op\n");
-      //fprintf(stderr, "mop: 0x%016" PRIx64 "\n", insn.bits());
-      //fprintf(stderr, "first insn: 0x%016" PRIx64 "\n", insn.mop_first_insn().bits());
-      //fprintf(stderr, "second insn: 0x%016" PRIx64 "\n", insn.mop_second_insn().bits());
       while ((insn.mop_first_insn().bits() & p->mask) != p->match)
         p++;
       
       insn_desc_t first = *p;
-      //fprintf(stderr, "first mask: 0x%016" PRIx64 "\n", first.mask);
-      //fprintf(stderr, "first match: 0x%016" PRIx64 "\n", first.match);
 
       p = &instructions[0];
       while ((insn.mop_second_insn().bits() & p->mask) != p->match)
         p++;
       
       insn_desc_t second = *p;
-      //fprintf(stderr, "second mask: 0x%016" PRIx64 "\n", second.mask);
-      //fprintf(stderr, "second match: 0x%016" PRIx64 "\n", second.match);
 
       insn_bits_t mop_mask = (second.mask << (insn.mop_length() * 8)) | first.mask;
       insn_bits_t mop_match = (second.match << (insn.mop_length() * 8)) | first.match;
-
-      //fprintf(stderr, "mop mask: 0x%016" PRIx64 "\n", mop_mask);
-      //fprintf(stderr, "mop match: 0x%016" PRIx64 "\n", mop_match);
-
-      //fprintf(stderr, "addlw mask: 0x%016" PRIx64 "\n", MASK_ADDLW);
-      //fprintf(stderr, "addlw match: 0x%016" PRIx64 "\n", MATCH_ADDLW);
       
       p = &instructions[0];
       while ((insn.bits() & mop_mask) != p->match && (p->mask != 0 || p->match != 0))
         p++;
       
-      //fprintf(stderr, "decoded mask: 0x%016" PRIx64 "\n", p->mask);
-      //fprintf(stderr, "decoded match: 0x%016" PRIx64 "\n", p->match);
       if (p->match == MATCH_ADDLW && p->mask == MASK_ADDLW) {
         macro_op_found = true;
       } else {
         p = &instructions[0];
         macro_op_found = false;
         insn = insn.mop_first_insn();
-        //idx = insn.bits() % OPCODE_CACHE_SIZE;
         while ((insn.bits() & p->mask) != p->match)
           p++;
       }
