@@ -134,6 +134,7 @@ int main(int argc, char** argv)
   bool dtb_enabled = true;
   bool real_time_clint = false;
   bool macro_op_fusion = false;
+  bool macro_op_detection = false;
   size_t nprocs = 1;
   size_t initrd_size;
   reg_t initrd_start = 0, initrd_end = 0;
@@ -246,6 +247,7 @@ int main(int argc, char** argv)
   parser.option(0, "initrd", 1, [&](const char* s){initrd = s;});
   parser.option(0, "real-time-clint", 0, [&](const char *s){real_time_clint = true;});
   parser.option(0, "mop-fusion", 0, [&](const char* s){macro_op_fusion = true;});
+  parser.option(0, "mop-detection", 0, [&](const char* s){macro_op_detection = true;});
   parser.option(0, "extlib", 1, [&](const char *s){
     void *lib = dlopen(s, RTLD_NOW | RTLD_GLOBAL);
     if (lib == NULL) {
@@ -283,17 +285,12 @@ int main(int argc, char** argv)
     initrd_size = get_file_size(initrd);
     for (auto& m : mems) {
       if (initrd_size && (initrd_size + 0x1000) < m.second->size()) {
-        printf("test\n");
          initrd_end = m.first + m.second->size() - 0x1000;
          initrd_start = initrd_end - initrd_size;
          read_file_bytes(initrd, 0, m.second->contents() + (initrd_start - m.first), initrd_size);
          break;
       }
     }
-    printf("initrd loaded\n");
-    printf("initrd size %ld\n", initrd_size);
-    printf("start: 0x%016" PRIx64 "\n", initrd_start);
-    printf("end: 0x%016" PRIx64 "\n", initrd_end);
   }
 
   sim_t s(isa, priv, varch, nprocs, halted, real_time_clint,
@@ -329,6 +326,7 @@ int main(int argc, char** argv)
   s.set_histogram(histogram);
   s.set_log_commits(log_commits);
   s.set_macro_op_fusion(macro_op_fusion);
+  s.set_macro_op_detection(macro_op_detection);
 
   auto return_code = s.run();
 

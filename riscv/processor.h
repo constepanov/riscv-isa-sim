@@ -245,6 +245,7 @@ public:
   void set_debug(bool value);
   void set_histogram(bool value);
   void set_macro_op_fusion(bool value);
+  void set_macro_op_detection(bool value);
   void set_log_commits(bool value);
   bool get_log_commits() { return log_commits_enabled; }
   void reset();
@@ -389,6 +390,7 @@ private:
   std::string isa_string;
   bool histogram_enabled;
   bool macro_op_fusion_enabled;
+  bool macro_op_detection_enabled;
   bool log_commits_enabled;
   bool halt_on_reset;
 
@@ -416,6 +418,8 @@ private:
   void build_opcode_map();
   void register_base_instructions();
   insn_func_t decode_insn(insn_t insn);
+
+  std::string get_disasm_mop(insn_t prev, insn_t current);
 
   // Track repeated executions for processor_t::disasm()
   uint64_t last_pc, last_bits, executions;

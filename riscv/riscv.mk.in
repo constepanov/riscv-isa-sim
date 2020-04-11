@@ -685,6 +685,7 @@ riscv_insn_list = \
 	$(riscv_insn_priv) \
 	addlw \
 	c_addlw \
+	sllisrli \
 
 riscv_gen_srcs = \
 	$(addsuffix .cc,$(riscv_insn_list))

@@ -238,6 +238,8 @@ private:
 #define WRITE_FRD(value) WRITE_FREG(insn.rd(), value)
  
 #define SHAMT (insn.i_imm() & 0x3F)
+#define SHAMT_MOP1 (insn.mop_first_insn().i_imm() & 0x3F)
+#define SHAMT_MOP2 (insn.mop_second_insn().i_imm() & 0x3F)
 #define BRANCH_TARGET (pc + insn.sb_imm())
 #define JUMP_TARGET (pc + insn.uj_imm())
 #define RM ({ int rm = insn.rm(); \

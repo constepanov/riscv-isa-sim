@@ -1,0 +1,2 @@
+require(SHAMT_MOP1 < xlen);
+MOP_WRITE_RD((MOP_RS1 << SHAMT_MOP1) >> SHAMT_MOP2);

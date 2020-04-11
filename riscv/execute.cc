@@ -158,14 +158,32 @@ void processor_t::detect_macro_op(insn_t prev, insn_t insn, reg_t pc) {
   while ((insn.bits() & p->mask) != p->match)
     p++;
   insn_desc_t second = *p;
-
+  
+  if (prev.rd() == insn.rd() && prev.bits() != 0) {
+    std::string disasm_mop = get_disasm_mop(prev, insn);
+    mop_histogram[disasm_mop]++;
+  }
+  
+  /*
   if (first.mask == MASK_SLLIW && first.match == MATCH_SLLIW && second.mask == MASK_SRAIW && second.match == MATCH_SRAIW) {
     if (prev.rd() == insn.rd()) {
-      mop_histogram["slliwsraiw"]++;
+      mop_histogram["slliw sraiw"]++;
+    }
+  } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LD && second.match == MATCH_LD) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["add ld"]++;
     }
   } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LW && second.match == MATCH_LW) {
     if (prev.rd() == insn.rd()) {
       mop_histogram["add lw"]++;
+    }
+  } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LH && second.match == MATCH_LH) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["add lh"]++;
+    }
+  } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LB && second.match == MATCH_LB) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["add lb"]++;
     }
   } else if (first.mask == MASK_ADD && first.match == MATCH_ADD && second.mask == MASK_LBU && second.match == MATCH_LBU) {
     if (prev.rd() == insn.rd()) {
@@ -183,6 +201,18 @@ void processor_t::detect_macro_op(insn_t prev, insn_t insn, reg_t pc) {
     if (prev.rd() == insn.rd()) {
       mop_histogram["lui addi"]++;
     }
+  } else if (first.mask == MASK_SLLI && first.match == MATCH_SLLI && second.mask == MASK_ADD && second.match == MATCH_ADD) {
+    if (prev.rd() == insn.rd()) {
+      // mop_histogram["slli add"]++;
+    }
+  } else if (first.mask == MASK_XOR && first.match == MATCH_XOR && second.mask == MASK_AND && second.match == MATCH_AND) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["xor and"]++;
+    }
+  } else if (first.mask == MASK_XOR && first.match == MATCH_XOR && second.mask == MASK_ANDI && second.match == MATCH_ANDI) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["xor andi"]++;
+    }
   } else if (first.mask == MASK_C_SLLI && first.match == MATCH_C_SLLI && second.mask == MASK_C_SRLI && second.match == MATCH_C_SRLI) {
     if (prev.rd() == insn.rvc_rs1s()) {
       mop_histogram["cslli csrli"]++;
@@ -195,7 +225,20 @@ void processor_t::detect_macro_op(insn_t prev, insn_t insn, reg_t pc) {
     if (prev.rd() == insn.rd()) {
       mop_histogram["cadd lhu"]++;
     }
+  } else if (first.mask == MASK_C_ADD && first.match == MATCH_C_ADD && second.mask == MASK_LD && second.match == MATCH_LD) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["cadd ld"]++;
+    }
+  } else if (first.mask == MASK_C_ADD && first.match == MATCH_C_ADD && second.mask == MASK_LH && second.match == MATCH_LH) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["cadd lh"]++;
+    }
+  } else if (first.mask == MASK_C_ADD && first.match == MATCH_C_ADD && second.mask == MASK_LBU && second.match == MATCH_LBU) {
+    if (prev.rd() == insn.rd()) {
+      mop_histogram["cadd lbu"]++;
+    }
   }
+  */
 }
 
 // fetch/decode/execute loop
@@ -262,6 +305,7 @@ void processor_t::step(size_t n)
           if (debug && !state.serialized)
             disasm(fetch.insn);
           pc = execute_insn(this, pc, fetch);
+          prev_insn = fetch.insn;
           advance_pc();
         }
       }
@@ -297,7 +341,7 @@ void processor_t::step(size_t n)
         // 
         #define ICACHE_ACCESS(i) { \
           insn_fetch_t fetch = ic_entry->data; \
-          if (!macro_op_fusion_enabled) detect_macro_op(prev_insn, fetch.insn, pc); \
+          if (macro_op_detection_enabled) detect_macro_op(prev_insn, fetch.insn, pc); \
           if (macro_op_fusion_enabled && fetch.insn.mop_length() != 0) macro_op_found = true; \
           if (macro_op_fusion_enabled && !macro_op_found) fetch.insn = fetch.insn.mop_first_insn(); \
           pc = execute_insn(this, pc, fetch); \

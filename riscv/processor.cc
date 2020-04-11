@@ -23,7 +23,8 @@
 processor_t::processor_t(const char* isa, const char* priv, const char* varch,
                          simif_t* sim, uint32_t id, bool halt_on_reset)
   : debug(false), halt_request(false), sim(sim), ext(NULL), id(id), xlen(0),
-  histogram_enabled(false), macro_op_fusion_enabled(false), log_commits_enabled(false),
+  histogram_enabled(false), macro_op_fusion_enabled(false), 
+  macro_op_detection_enabled(false), log_commits_enabled(false),
   halt_on_reset(halt_on_reset), last_pc(1), executions(1)
 {
   VU.p = this;
@@ -52,12 +53,18 @@ processor_t::~processor_t()
   }
 #endif
   
-  fprintf(stderr, "insn count: %ld\n", state.minstret);
-  for (auto it : mop_histogram) {
-    mop_count += it.second;
-    fprintf(stderr, "%s count: %ld, percent: %f\n", it.first.c_str(), it.second, (double) it.second / state.minstret);
+  if (macro_op_fusion_enabled || macro_op_detection_enabled) {
+    fprintf(stderr, "insn count: %ld\n", state.minstret);
+    for (auto it : mop_histogram) {
+      mop_count += it.second;
+      double percent =  (double(it.second) / state.minstret) * 100.0;
+      if (percent >= 0.5) {
+        fprintf(stderr, "%s count: %ld, %f%%\n", it.first.c_str(), it.second, percent);
+      }
+    }
+    double total_percent = (double(mop_count) / state.minstret) * 100.0;
+    fprintf(stderr, "total macro-op count: %ld, %f%%\n", mop_count, total_percent);
   }
-  fprintf(stderr, "total macro-op count: %ld, percent: %f\n", mop_count, (double) mop_count / state.minstret);
   
   delete mmu;
   delete disassembler;
@@ -353,6 +360,11 @@ void processor_t::set_histogram(bool value)
 void processor_t::set_macro_op_fusion(bool value)
 {
   macro_op_fusion_enabled = value;
+}
+
+void processor_t::set_macro_op_detection(bool value)
+{
+  macro_op_detection_enabled = value;
 }
 
 void processor_t::set_log_commits(bool value)
@@ -1058,11 +1070,16 @@ insn_func_t processor_t::decode_insn(insn_t insn)
       insn_bits_t mop_mask = (second.mask << (insn.mop_length() * 8)) | first.mask;
       insn_bits_t mop_match = (second.match << (insn.mop_length() * 8)) | first.match;
       
+      //fprintf(stderr, "mop mask: 0x%016" PRIx64 "\n", mop_mask);
+      //fprintf(stderr, "mop match: 0x%016" PRIx64 "\n", mop_match);
+
       p = &instructions[0];
       while ((insn.bits() & mop_mask) != p->match && (p->mask != 0 || p->match != 0))
         p++;
       
       if (p->match == MATCH_ADDLW && p->mask == MASK_ADDLW) {
+        macro_op_found = true;
+      } else if (p->match == MATCH_SLLISRLI && p->mask == MASK_SLLISRLI) {
         macro_op_found = true;
       } else {
         p = &instructions[0];
@@ -1094,6 +1111,13 @@ insn_func_t processor_t::decode_insn(insn_t insn)
   }
 
   return xlen == 64 ? desc.rv64 : desc.rv32;
+}
+
+std::string processor_t::get_disasm_mop(insn_t prev, insn_t current) {
+  std::string disasm_first_insn = disassembler->disassemble(prev);
+  std::string disasm_second_insn = disassembler->disassemble(current);
+  return disasm_first_insn.substr(0, disasm_first_insn.find(" ")) + 
+        disasm_second_insn.substr(0, disasm_second_insn.find(" "));
 }
 
 void processor_t::register_insn(insn_desc_t desc)

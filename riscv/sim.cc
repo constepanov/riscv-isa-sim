@@ -35,9 +35,9 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
              const debug_module_config_t &dm_config)
   : htif_t(args), mems(mems), plugin_devices(plugin_devices),
     procs(std::max(nprocs, size_t(1))), initrd_start(initrd_start), initrd_end(initrd_end), start_pc(start_pc), current_step(0),
-    current_proc(0), debug(false), histogram_enabled(false),
-    macro_op_fusion_enabled(false),
-    log_commits_enabled(false), dtb_enabled(true),
+    current_proc(0), debug(false), histogram_enabled(false), log_commits_enabled(false),
+    macro_op_fusion_enabled(false), macro_op_detection_enabled(false),
+    dtb_enabled(true),
     remote_bitbang(NULL), debug_module(this, dm_config)
 {
   signal(SIGINT, &handle_signal);
@@ -152,6 +152,14 @@ void sim_t::set_macro_op_fusion(bool value)
   macro_op_fusion_enabled = value;
   for (size_t i = 0; i < procs.size(); i++) {
     procs[i]->set_macro_op_fusion(macro_op_fusion_enabled);
+  }
+}
+
+void sim_t::set_macro_op_detection(bool value)
+{
+  macro_op_detection_enabled = value;
+  for (size_t i = 0; i < procs.size(); i++) {
+    procs[i]->set_macro_op_detection(macro_op_detection_enabled);
   }
 }
 
